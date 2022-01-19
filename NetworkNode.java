@@ -17,6 +17,7 @@ public class NetworkNode {
     public void startServer(boolean isGateway) {
         try {
             while(!serverSocket.isClosed()) {
+                System.out.println(serverSocket.getLocalPort());
                 // 1,5 sekundowy timeout
                 //serverSocket.setSoTimeout(1500);
                 Socket socket = serverSocket.accept();
@@ -46,8 +47,9 @@ public class NetworkNode {
 
     public static void main(String[] args) throws IOException {
         NodeResource r = new NodeResource(args, "adds");
-        ServerSocket serversocket = new ServerSocket(r.getIP());
+        ServerSocket serversocket = new ServerSocket(r.getNodePort());
         NetworkNode server = new NetworkNode(serversocket, r);
+        System.out.println("DEBUG:");
         server.startServer(r.isGateway());
     }
 }

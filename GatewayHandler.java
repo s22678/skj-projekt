@@ -26,11 +26,11 @@ public class GatewayHandler implements Runnable {
             this.bufferedWriter = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
             this.bufferedReader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
             connectedNodeID = bufferedReader.readLine();
+            queue.add(this);
             broadcastMessage("GW-SERVER: " + connectedNodeID + " polaczyl sie do sieci");
         } catch (IOException e) {
             e.printStackTrace();
         }
-        queue.add(this);
     }
 
     @Override
@@ -40,17 +40,24 @@ public class GatewayHandler implements Runnable {
             try {
                 messageFromNode = bufferedReader.readLine();
                 if ("QUERY".equals(messageFromNode)) {
-                    writeMessage(queryResources());
+                    for(NodeResource value : map.values()){
+                        writeMessage(value.toString());
+                    }
+//                    writeMessage(queryResources());
                 } else if ("ADD".equals(messageFromNode)) {
                     messageFromNode = bufferedReader.readLine();
                     addResources(messageFromNode);
-                    System.out.println("GW-SERVER: zasoby dodane" + messageFromNode);
+                    System.out.println("GW-SERVER: zasoby dodane " + messageFromNode);
                 } else if ("RESERVE".equals(messageFromNode)) {
                     messageFromNode = bufferedReader.readLine();
                     reserveResources(messageFromNode);
+                    System.out.println("GW-SERVER: zasoby zarezerwowane " + messageFromNode);
                 } else if ("TERMINATE".equals(messageFromNode)) {
                     broadcastMessage(messageFromNode);
                     socket.close();
+                } else {
+                    String response = "GW-SERVER: polecenie od klienta " + messageFromNode;
+                    reserveResources(messageFromNode);
                 }
             } catch (IOException e) {
                 closeEverything(socket, bufferedReader, bufferedWriter, "wystapil blad odczytu wiadomosci od klienta w metodzie 'run'");
@@ -63,6 +70,7 @@ public class GatewayHandler implements Runnable {
     // TODO
     public String queryResources() {
         return "A:5,B:3,C:4";
+//        map.values().forEach(v -> System.out.println(("value: " + v)));
     }
 
     // TODO
@@ -126,14 +134,15 @@ public class GatewayHandler implements Runnable {
         }
     }
 
+    // TODO Usunac komentarze z IF'a?
     public void broadcastMessage(String val) {
         for(GatewayHandler gatewayHandler : queue) {
             try {
-                if (!gatewayHandler.connectedNodeID.equals(connectedNodeID)) {
+//                if (!gatewayHandler.connectedNodeID.equals(connectedNodeID)) {
                     gatewayHandler.bufferedWriter.write(val);
                     gatewayHandler.bufferedWriter.newLine();
                     gatewayHandler.bufferedWriter.flush();
-                }
+//                }
             } catch (IOException e) {
                 closeEverything(socket, bufferedReader, bufferedWriter, "nie mozna wyslac broacastu do: " + gatewayHandler.connectedNodeID);
             }
