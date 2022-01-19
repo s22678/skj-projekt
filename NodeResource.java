@@ -1,4 +1,3 @@
-import java.util.Collections;
 import java.util.Hashtable;
 
 public class NodeResource {
@@ -31,7 +30,7 @@ public class NodeResource {
                 '}';
     }
 
-    public NodeResource(String[] args, String operation) {
+    public NodeResource(String[] args, String operation) throws IllegalArgumentException {
         this.operation = operation;
         String remaining = null;
 
@@ -56,25 +55,44 @@ public class NodeResource {
             }
         }
 
-        String[] resourceArray = remaining.split("[:,]");
-        for (int i = 0; i < resourceArray.length; i++) {
-            switch (resourceArray[i]) {
-                case "A":
-                    a = Integer.parseInt(resourceArray[++i]);
-                    break;
-                case "B":
-                    b = Integer.parseInt(resourceArray[++i]);
-                    break;
-                case "C":
-                    c = Integer.parseInt(resourceArray[++i]);
-                    break;
+        try {
+            String[] resourceArray = remaining.split("[:,]");
+            for (int i = 0; i < resourceArray.length; i++) {
+                switch (resourceArray[i]) {
+                    case "A":
+                        try {
+                            a = Integer.parseInt(resourceArray[++i]);
+                        } catch (NumberFormatException e) {
+                            a = 0;
+                        }
+                        break;
+                    case "B":
+                        try {
+                            b = Integer.parseInt(resourceArray[++i]);
+                        } catch (NumberFormatException e) {
+                            b = 0;
+                        }
+                        break;
+                    case "C":
+                        try {
+                            c = Integer.parseInt(resourceArray[++i]);
+                        } catch (NumberFormatException e) {
+                            c = 0;
+                        }
+                        break;
+                }
             }
+        } catch (NullPointerException e) {
+            throw new IllegalArgumentException("niepoprawna ilosc argumentow. uzycie: NetworkNode -ident <identyfikator:liczba> -tcpport <port:liczba> <zasob:liczba> [<zasob:liczba>] ");
         }
 
         isGateway = (gatewayHostAddr == null && "adds".equals(operation));
+        if (id == null) {
+            throw new IllegalArgumentException("ID IS NULL! PROVIDE -ident <INTEGER> flag to the request");
+        }
     }
 
-    public NodeResource(String arg, String operation) {
+    public NodeResource(String arg, String operation) throws IllegalArgumentException {
         this(arg.split(" "), operation);
     }
 
@@ -98,16 +116,15 @@ public class NodeResource {
         return nodePort;
     }
 
-    public Hashtable<String, Integer> getAddedRecources() {
-        if ("adds".equals(operation)) {
-            Hashtable<String, Integer> tempHash = new Hashtable<String, Integer>();
-            tempHash.put("A", a);
-            tempHash.put("B", b);
-            tempHash.put("C", c);
+    public Integer getA() {
+        return a;
+    }
 
-            return tempHash;
-        } else {
-            return (Hashtable<String, Integer>) Collections.<String, Integer>emptyMap();
-        }
+    public Integer getB() {
+        return b;
+    }
+
+    public Integer getC() {
+        return c;
     }
 }

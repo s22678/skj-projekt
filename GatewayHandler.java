@@ -1,9 +1,13 @@
+import javax.xml.soap.Node;
 import java.io.*;
 import java.net.Socket;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class GatewayHandler implements Runnable {
+
+    private final static String ADDS = "adds";
+    private final static String RESERVES = "reserves";
 
     public static ConcurrentHashMap<String, NodeResource> map = new ConcurrentHashMap<>();
     public static ConcurrentLinkedQueue<GatewayHandler> queue = new ConcurrentLinkedQueue<>();
@@ -15,7 +19,7 @@ public class GatewayHandler implements Runnable {
 
     // ID Node gateway'a
     private String nodeID = null;
-    private String connectedNodeID = null;
+    private String connectedClientID = null;
 
     public GatewayHandler(Socket socket, NodeResource resource) {
         try {
@@ -25,9 +29,9 @@ public class GatewayHandler implements Runnable {
             addResourceToMap();
             this.bufferedWriter = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
             this.bufferedReader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-            connectedNodeID = bufferedReader.readLine();
+            connectedClientID = socket.getInetAddress().getHostName() + ":" + socket.getPort();
             queue.add(this);
-            broadcastMessage("GW-SERVER: " + connectedNodeID + " polaczyl sie do sieci");
+            broadcastMessage("GW-SERVER: " +  connectedClientID + " polaczyl sie do sieci");
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -40,28 +44,35 @@ public class GatewayHandler implements Runnable {
             try {
                 messageFromNode = bufferedReader.readLine();
                 if ("QUERY".equals(messageFromNode)) {
-                    for(NodeResource value : map.values()){
-                        writeMessage(value.toString());
-                    }
-//                    writeMessage(queryResources());
+                    writeMessage(queryResources());
                 } else if ("ADD".equals(messageFromNode)) {
                     messageFromNode = bufferedReader.readLine();
-                    addResources(messageFromNode);
+                    addNodeResource(messageFromNode, GatewayHandler.ADDS);
                     System.out.println("GW-SERVER: zasoby dodane " + messageFromNode);
                 } else if ("RESERVE".equals(messageFromNode)) {
                     messageFromNode = bufferedReader.readLine();
-                    reserveResources(messageFromNode);
+                    addNodeResource(messageFromNode, GatewayHandler.RESERVES);
                     System.out.println("GW-SERVER: zasoby zarezerwowane " + messageFromNode);
                 } else if ("TERMINATE".equals(messageFromNode)) {
                     broadcastMessage(messageFromNode);
                     socket.close();
+                } else if(socket.getInputStream().read() == -1) {
+                    System.out.println("klient/node odlaczony, zamykam socket...");
+                    socket.close();
                 } else {
-                    String response = "GW-SERVER: polecenie od klienta " + messageFromNode;
-                    reserveResources(messageFromNode);
+                    System.out.println("GW-SERVER: wiadomosc od klienta " + messageFromNode);
+                    writeMessage("nie rozpoznano polecenia " + messageFromNode);
                 }
             } catch (IOException e) {
                 closeEverything(socket, bufferedReader, bufferedWriter, "wystapil blad odczytu wiadomosci od klienta w metodzie 'run'");
                 break;
+            } catch (NullPointerException e) {
+                System.out.println("GW-SERVER: POWAZNY BLAD");
+                e.printStackTrace();
+                closeEverything(socket, bufferedReader, bufferedWriter, "wystapil blad odczytu wiadomosci od klienta w metodzie 'run'");
+            } catch (IllegalArgumentException e) {
+                System.out.println(e.getMessage());
+                closeEverything(socket, bufferedReader, bufferedWriter, "wystapil blad odczytu wiadomosci od klienta w metodzie 'run'");
             }
         }
         System.out.println("Zamykam polaczenie");
@@ -69,29 +80,65 @@ public class GatewayHandler implements Runnable {
 
     // TODO
     public String queryResources() {
-        return "A:5,B:3,C:4";
-//        map.values().forEach(v -> System.out.println(("value: " + v)));
+        Integer totalA = 0;
+        Integer totalB = 0;
+        Integer totalC = 0;
+        for(NodeResource nodeResource : map.values()){
+            if(nodeResource.getOperation().equals("adds")) {
+                totalA += nodeResource.getA();
+                totalB += nodeResource.getB();
+                totalC += nodeResource.getC();
+            } else {
+                totalA -= nodeResource.getA();
+                totalB -= nodeResource.getB();
+                totalC -= nodeResource.getC();
+            }
+        }
+        return "A:" + totalA + " B:" + totalB + " C:" + totalC;
     }
 
-    // TODO
-    public void addResources(String msg) {
-        // dodaj zasoby do mapy
-    }
+//    // TODO
+//    public void addResources(String msg) {
+//        System.out.println("GW-SERVER: metoda addResources()");
+//        NodeResource tempNodeResource = createResource(msg, "adds");
+//        connectedClientID = tempNodeResource.getId();
+//        addResourceToMap(connectedClientID, tempNodeResource);
+//    }
+//
+//    // TODO
+//    public void reserveResources(String msg) {
+//        System.out.println("GW-SERVER: metoda reserveResources()");
+//            NodeResource tempNodeResource = createResource(msg, "removes");
+//            connectedClientID = tempNodeResource.getId();
+//            addResourceToMap(connectedClientID, tempNodeResource);
+//    }
+//
+//    public NodeResource createResource(String msg, String ops) {
+//        NodeResource r = null;
+//        try{
+//            r = new NodeResource(msg, ops);
+//        } catch (InstantiationException e) {
+//            closeEverything(socket, bufferedReader, bufferedWriter, e.getMessage());
+//        }
+//
+//        return r;
+//    }
 
-    // TODO
-    public void reserveResources(String msg) {
-        // usun zasoby z mapy
+    public void addNodeResource(String messageFromClient, String operations) throws IllegalArgumentException {
+        System.out.println("GW-SERVER: metoda addNodeResources()");
+        NodeResource tempNodeResource = new NodeResource(messageFromClient, operations);
+        addResourceToMap(connectedClientID, tempNodeResource);
     }
 
     public void closeEverything(Socket socket, BufferedReader bufferedReader, BufferedWriter bufferedWriter, String closingMessage) {
         System.out.print("GW-SERVER: " + closingMessage + " ZAMYKAM POLACZENIE OD: ");
-        if (connectedNodeID == null) {
+        if (connectedClientID == null) {
             System.out.println(Thread.currentThread());
         } else {
-            System.out.println(connectedNodeID);
+            System.out.println(connectedClientID);
         }
         removeResourceFromMap();
-        removeChatClientHandler();
+        removeClientHandler();
         try {
             if(bufferedReader != null) {
                 bufferedReader.close();
@@ -111,11 +158,14 @@ public class GatewayHandler implements Runnable {
         if (map.containsKey(nodeID)) {
             map.remove(nodeID);
         }
+        if (map.containsKey(connectedClientID)) {
+            map.remove(connectedClientID);
+        }
     }
 
-    public void removeChatClientHandler() {
+    public void removeClientHandler() {
         queue.remove(this);
-        broadcastMessage("GW-SERVER: " + connectedNodeID + " opuscil siec");
+        broadcastMessage("GW-SERVER: " + nodeID + " opuscil siec");
     }
 
     public void addResourceToMap() {
@@ -144,7 +194,7 @@ public class GatewayHandler implements Runnable {
                     gatewayHandler.bufferedWriter.flush();
 //                }
             } catch (IOException e) {
-                closeEverything(socket, bufferedReader, bufferedWriter, "nie mozna wyslac broacastu do: " + gatewayHandler.connectedNodeID);
+                closeEverything(socket, bufferedReader, bufferedWriter, "nie mozna wyslac broacastu do: " + gatewayHandler.nodeID);
             }
         }
     }

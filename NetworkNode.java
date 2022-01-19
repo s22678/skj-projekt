@@ -46,10 +46,14 @@ public class NetworkNode {
     }
 
     public static void main(String[] args) throws IOException {
-        NodeResource r = new NodeResource(args, "adds");
-        ServerSocket serversocket = new ServerSocket(r.getNodePort());
-        NetworkNode server = new NetworkNode(serversocket, r);
-        System.out.println("DEBUG:");
-        server.startServer(r.isGateway());
+        try {
+            NodeResource r = new NodeResource(args, "adds");
+            ServerSocket serversocket = new ServerSocket(r.getNodePort());
+            NetworkNode server = new NetworkNode(serversocket, r);
+            System.out.println("DEBUG:");
+            server.startServer(r.isGateway());
+        } catch (IllegalArgumentException e) {
+            System.out.println(e.getMessage());
+        }
     }
 }
